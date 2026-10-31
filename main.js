@@ -1,9 +1,9 @@
 #!/usr/bin/env node
+import { readdir } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 const arg = process.argv.slice(2);
-console.log("users args are: ", arg);
-
 if (arg.length === 3) {
   const argument1 = arg[0];
   const argument2 = arg[1];
@@ -31,9 +31,26 @@ async function findMatchingLines(pattern, file) {
   }
 }
 
+async function getAllFiles(folderPath, arrayOfFiles = []) {
+  const entries = await readdir(folderPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const filePath = path.join(folderPath, entry.name);
+
+    if (entry.isDirectory()) {
+      arrayOfFiles = await getAllFiles(filePath, arrayOfFiles);
+    } else {
+      arrayOfFiles.push(filePath);
+    }
+
+  }
+  return arrayOfFiles;
+}
+
 async function matchingLinesDiff(option, pattern, file) {
   let matchPattern = [];
   let count = 1;
+
   if (option === "-i") {
     const fileData = await readFile(file);
     const lines = fileData.toString().split("\n");
@@ -63,6 +80,38 @@ async function matchingLinesDiff(option, pattern, file) {
 
     for (const line of matchPattern) {
       console.log(`${line.lineNumber}:${line.text}`);
+    }
+  } else if (option === "-v") {
+    const fileData = await readFile(file);
+    const lines = fileData.toString().split("\n");
+
+    for (let line of lines) {
+      if (!line.includes(pattern)) {
+        matchPattern.push(line);
+      }
+    }
+
+    for (const line of matchPattern) {
+      console.log(line);
+    }
+
+  } else if (option === "-r") {
+    const allFiles = await getAllFiles(file);
+
+    for (const file of allFiles) {
+      const fileData = await readFile(file);
+      const lines = fileData.toString().split("\n");
+
+      for (let line of lines) {
+        if (line.includes(pattern)) {
+          const info = { lineContent: line, lineFilePath: file };
+          matchPattern.push(info);
+        }
+      }
+    }
+
+    for (const line of matchPattern) {
+      console.log(`${line.lineFilePath}:${line.lineContent}`);
     }
   }
 }
